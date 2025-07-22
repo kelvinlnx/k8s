@@ -1,0 +1,71 @@
+# 1. set hostname
+sudo hostnamectl hostname s1-master-1 
+
+# 2. install pkgs
+sudo apt install -y curl gnupg2 software-properties-common lsb-release ca-certificates apt-transport-https docker.io
+
+# 3. add user to docker group
+sudo usermod -aG docker $USERNAME
+
+# 4. update iptables ref
+sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
+
+# 5. add k8s gpg and repo
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.33/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+# 6. Disable swap
+sudo swapoff -a
+sudo vi /etc/fstab    # comment out all swap lines
+
+# 7. Configure modules load and parms
+echo "overlay
+br_netfilter" | sudo tee /etc/modules-load.d/k8s.conf
+
+echo "net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1" | sudo tee /etc/sysctl.d/99-k8s.conf
+
+# 8. Config containerd
+sudo sed -i 's/pause:3.8/pause:3.10/' /etc/containerd/config.toml
+sudo sed -i 's/(\s+SystemdCgroup\s*=\s*)false/\1true' /etc/containerd/config.toml
+sudo systemctl daemon-reload
+sudo systemctl restart containerd
+
+# 9. Extra packages & /etc/hosts
+sudo apt install -y vim bash-completion
+sudo vi /etc/hosts   # add master and worker ip address
+
+# 10. Install kubernetes components
+sudo apt install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+# 11. Optional configure master node to limit logs
+echo '{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2"
+}' | sudo tee /etc/docker/daemon.json
+
+# 11b. REBOOT the server
+sudo reboot
+
+# 12. INITIALIZE KUBERNETES CONTOL PLANE
+# flannel CNI requires the pod network be set to 10.244.0.0/16
+kubeadm init --pod-network-cidr 10.244.0.0/16 --image-repository=registry.k8s.io --kubernetes-version=1.33.2
+
+# 13. Install Flannel CNI
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+# run this on the master node to get the join command anytime
+kubeadm token create --print-join-command
+
+ON WORKER NODES:
+# Perform step 1 to 11b
+#14: Join the cluster
+Type the command returned by "kubeadm token create --print-join-command" that was ran on the master.
+
