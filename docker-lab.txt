@@ -1,0 +1,102 @@
+# Sample Docker Lab
+# by Kelvin Lai
+
+docker search registry.access.redhat.com/ubi8
+docker pull registry.access.redhat.com/ubi8/ubi:8.0
+docker images
+
+# Check how many layers in original ubi image
+docker inspect ubi:8.0 | sed -n '/Layers/,/\]/{//!p;}' | wc -l 
+
+# Create container named ubi-web with an interactive shell session
+docker run --name ubi-web -it ubi:8.0 /bin/bash
+
+# While inside the container, install the apache webserve & configure it to listen to port 8080
+yum install -y httpd
+yum clean all
+sed -i 's/^Listen 80 *$/Listen 8080/' /etc/httpd/conf/httpd.conf
+exit
+
+# Check the containers, you shouldn't see the ubi-web because it's already dead
+docker ps
+
+# List all containers
+docker ps -a
+
+# Save the ubi-web container as an image that we can use in future
+# Earlier versions of docker requires that the CMD list doesn't have space after the comma(,)
+docker commit -a "Student Name" -c 'ENTRYPOINT ["httpd"]' -c 'CMD ["-D","FOREGROUND"]' -c "EXPOSE 8080" ubi-web quay.io/<YOUR_USERNAME>/ubi-web:1.0
+
+# List out the images
+docker images
+
+# Check how many Layers compared to the original image
+docker inspect ubi-web:1.0 | sed -n '/Layers/,/\]/{//!p;}' | wc -l
+
+# Create directory to host the website
+cd
+mkdir myweb
+echo Hello World > myweb/index.html
+
+# Start your webserver
+#   in the background
+#   map your localhost port 12345 to containers port 8080
+#   map myweb directory to /var/www/html
+#   and name it myweb
+docker run -d -p 12345:8080 -v ~/myweb:/var/www/html:Z --name myweb ubi-web:1.0
+
+# Verify the container is running
+docker ps
+
+sudo setenforce 0
+
+# Test your website
+curl localhost:12345
+
+# Stop the container
+docker stop myweb
+
+# Verify
+docker ps		# container not listed
+docker ps -a		# container listed
+
+# Remove the container and verify it's removed
+docker rm myweb
+docker ps -a
+
+# Extra:
+# Having Fun Time - learning ENTRYPOINT and CMD
+# 
+docker commit -c 'CMD ["date", "+%d/%m/%Y"]' ubi-web:1.0 mydate:1.0
+docker commit -c 'ENTRYPOINT ["date"]' -c 'CMD ["+%d/%m/%Y"]' ubi-web:1.0 mydate:2.0
+docker run mydate:1.0
+docker run mydate:1.0 +%A		# doesn't work
+docker run mydate:1.0 date +%A
+docker run mydate:1.0 echo Hello World
+docker run mydate:2.0
+docker run mydate:2.0 echo Hi		# doesn't work, because docker treats this as ENTRYPOINT + <YOUR ARGS> = date echo Hi
+docker run mydate:2.0 +%A		# same as date +%A - the +%d/%m/%Y got overwritten
+
+# Remove ALL containers
+docker rm $(docker ps -aq)
+
+# Push your image to your repository in the registry
+docker images
+docker push quay.io/<USER_NAME>/ubi-web:1.0       # This will fail because you've not logged in to the registry
+docker login quay.io                              # Key in your USER_NAME and PASSWORD
+
+# Try pushing again after login
+docker push quay.io/<USER_NAME>/ubi-web:1.0
+
+# Check if image is in your quay.io repository
+
+# Remove ALL images
+docker rmi -f $(docker images -q)
+docker ps -a
+docker images
+
+# Try retrieving your image
+docker pull quay.io/<USER_NAME>/ubi-web:1.0
+docker images
+
+# Clean up delete the image from your local storage
