@@ -1,11 +1,12 @@
 spec:
   template:
     spec:
-    - name: YOUR_CONTAINER_NAME
-      volumeMounts:
+      containers:
+      - name: YOUR_CONTAINER_NAME
+        volumeMounts:
+        - name: config-volume
+          mountPath: /opt/data
+      volumes:
       - name: config-volume
-        mountPath: /opt/data
-    volumes:
-    - name: config-volume
-      configMap:
-        name: CONFIG_MAP_NAME
+        configMap:
+          name: CONFIG_MAP_NAME
