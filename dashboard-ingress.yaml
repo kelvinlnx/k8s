@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"  # Dashboard uses HTTPS
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"    # Bypass Nginx SSL termination
+    nginx.ingress.kubernetes.io/rewrite-target: /          # Rewrite path if needed
+spec:
+  ingressClassName: nginx   # Matches the IngressClass you configured
+  rules:
+  - host: dashboard.example.com  # Replace with your domain (or use IP if no DNS)
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kubernetes-dashboard-kong-proxy  # Dashboard Service name
+            port:
+              number: 443               # Dashboard Service port (HTTPS)
