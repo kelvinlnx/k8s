@@ -1,0 +1,17 @@
+controller:
+  hostNetwork: true       # Bind directly to host ports
+  hostPort:
+    enabled: true         # Open ports on the host
+  kind: DaemonSet        # Ensures one pod per node
+  service:
+    enabled: false        # Disable NodePort/LoadBalancer services
+  ingressClassResource:
+    enabled: true
+    name: nginx
+    default: true
+  ingressClass: nginx
+  watchIngressWithoutClass: false  # Only watch Ingresses with class: nginx
+  publishService:
+    enabled: false        # Disable publishing a Service
+  extraArgs:
+    publish-status-address: "0.0.0.0"  # Allow external status checks
